@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import requests
 import re
@@ -25,7 +24,6 @@ def extract_video_id(url):
 def get_video_info(url):
     """Get video information including available qualities."""
     try:
-        # Send request with mobile user agent to get mobile version
         headers = {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 12_2 like Mac OS X) AppleWebKit/605.1.15'
         }
@@ -33,7 +31,6 @@ def get_video_info(url):
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Find video data in the page
         scripts = soup.find_all('script')
         video_data = None
         
@@ -47,7 +44,6 @@ def get_video_info(url):
         if not video_data:
             return None
         
-        # Extract available qualities
         qualities = []
         if 'video_qualities' in video_data:
             for quality in video_data['video_qualities']:
@@ -65,13 +61,23 @@ def get_video_info(url):
 def download_video(url, output_path):
     """Download video from URL."""
     try:
-        urllib.request.urlretrieve(url, output_path)
+        response = requests.get(url, stream=True)
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(output_path, 'wb') as f, st.progress(0) as progress_bar:
+            dl = 0
+            for data in response.iter_content(chunk_size=1024):
+                dl += len(data)
+                f.write(data)
+                progress = int(100 * dl / total_size)
+                progress_bar.progress(progress)
         return True
     except Exception as e:
         st.error(f"Error downloading video: {str(e)}")
         return False
 
 # Streamlit UI
+st.set_page_config(page_title="Facebook Video Downloader")
 st.title("Facebook Video Downloader")
 st.write("Enter a Facebook video URL to download it in your preferred quality.")
 
@@ -84,7 +90,8 @@ if video_url:
     downloads_dir.mkdir(exist_ok=True)
     
     # Get video information
-    qualities = get_video_info(video_url)
+    with st.spinner("Fetching video information..."):
+        qualities = get_video_info(video_url)
     
     if qualities:
         # Create quality selection dropdown
@@ -101,15 +108,18 @@ if video_url:
             
             with st.spinner("Downloading video..."):
                 if download_video(selected_url, str(output_path)):
-                    st.success(f"Video downloaded successfully! Saved as: {output_path.name}")
+                    st.success(f"Video downloaded successfully!")
                     
                     # Add download link
                     with open(output_path, 'rb') as f:
                         st.download_button(
-                            label="Click to save to your device",
+                            label="Save video to your device",
                             data=f,
                             file_name=output_path.name,
                             mime="video/mp4"
                         )
     else:
         st.error("Could not retrieve video information. Please check the URL and try again.")
+
+st.markdown("---")
+st.markdown("Made with ❤️ using Streamlit")
