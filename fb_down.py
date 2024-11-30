@@ -3,9 +3,7 @@ import requests
 import re
 from bs4 import BeautifulSoup
 import json
-import urllib.request
 from pathlib import Path
-import os
 
 def extract_video_id(url):
     """Extract Facebook video ID from URL."""
@@ -58,37 +56,32 @@ def get_video_info(url):
         st.error(f"Error getting video info: {str(e)}")
         return None
 
-def download_video(url, output_path):
-    """Download video from URL."""
-    try:
-        response = requests.get(url, stream=True)
-        total_size = int(response.headers.get('content-length', 0))
-        
-        with open(output_path, 'wb') as f, st.progress(0) as progress_bar:
-            dl = 0
-            for data in response.iter_content(chunk_size=1024):
-                dl += len(data)
-                f.write(data)
-                progress = int(100 * dl / total_size)
-                progress_bar.progress(progress)
-        return True
-    except Exception as e:
-        st.error(f"Error downloading video: {str(e)}")
-        return False
-
 # Streamlit UI
-st.set_page_config(page_title="Facebook Video Downloader")
-st.title("Facebook Video Downloader")
-st.write("Enter a Facebook video URL to download it in your preferred quality.")
+st.set_page_config(
+    page_title="Facebook Video Downloader",
+    page_icon="📹",
+    layout="centered"
+)
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .stButton>button {
+        width: 100%;
+    }
+    .main {
+        padding: 2rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("📹 Facebook Video Downloader")
+st.markdown("Enter a Facebook video URL to download it in your preferred quality.")
 
 # Input for video URL
-video_url = st.text_input("Enter Facebook Video URL")
+video_url = st.text_input("Enter Facebook Video URL", placeholder="https://www.facebook.com/watch?v=...")
 
 if video_url:
-    # Create downloads directory if it doesn't exist
-    downloads_dir = Path("downloads")
-    downloads_dir.mkdir(exist_ok=True)
-    
     # Get video information
     with st.spinner("Fetching video information..."):
         qualities = get_video_info(video_url)
@@ -98,28 +91,28 @@ if video_url:
         quality_labels = [q['label'] for q in qualities]
         selected_quality = st.selectbox("Select Video Quality", quality_labels)
         
-        # Download button
-        if st.button("Download Video"):
-            selected_url = next(q['url'] for q in qualities if q['label'] == selected_quality)
-            
-            # Generate output filename
-            video_id = extract_video_id(video_url) or 'video'
-            output_path = downloads_dir / f"facebook_{video_id}_{selected_quality}.mp4"
-            
-            with st.spinner("Downloading video..."):
-                if download_video(selected_url, str(output_path)):
-                    st.success(f"Video downloaded successfully!")
-                    
-                    # Add download link
-                    with open(output_path, 'rb') as f:
-                        st.download_button(
-                            label="Save video to your device",
-                            data=f,
-                            file_name=output_path.name,
-                            mime="video/mp4"
-                        )
+        # Get download URL
+        download_url = next(q['url'] for q in qualities if q['label'] == selected_quality)
+        
+        # Create download link
+        st.markdown(f"""
+            <div style='text-align: center'>
+                <a href='{download_url}' target='_blank' download>
+                    <button style='padding: 10px 20px; background-color: #FF4B4B; color: white; border: none; border-radius: 5px; cursor: pointer;'>
+                        Download Video ({selected_quality})
+                    </button>
+                </a>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("⚠️ If the download doesn't start automatically, right-click the button and select 'Save link as...'")
     else:
         st.error("Could not retrieve video information. Please check the URL and try again.")
 
 st.markdown("---")
-st.markdown("Made with ❤️ using Streamlit")
+st.markdown("""
+<div style='text-align: center'>
+    <p>Made with ❤️ using Streamlit</p>
+    <p style='font-size: 0.8rem; color: #888;'>Note: This tool is for personal use only. Please respect Facebook's terms of service.</p>
+</div>
+""", unsafe_allow_html=True)
